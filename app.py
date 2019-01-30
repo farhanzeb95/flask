@@ -1,4 +1,5 @@
-from flask import Flask, jsonify, json, request, session
+import os
+from flask import Flask, jsonify, json, request, session, redirect
 from flask_pymongo import PyMongo
 from bson.objectid import ObjectId
 from datetime import datetime
@@ -6,8 +7,11 @@ from flask_bcrypt import Bcrypt
 from werkzeug import secure_filename
 from AddUser import User, AddItem
 
+UPLOAD_FOLDER = 'Item_Images'
+ALLOWED_EXTENSIONS = set(['png', 'jpg', 'jpeg'])
+
 app = Flask(__name__)
-app.debug = True
+app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 app.config['MONGO_DBNAME']= 'GDSD'
 app.config['MONGO_URI']= 'mongodb://localhost:27017/new_user'
 
@@ -16,6 +20,10 @@ app.secret_key='secretkey'
 mongo = PyMongo(app)
 bcrypt = Bcrypt(app)
 
+def allowed_file(filename):
+    return '.' in filename and \
+           filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
+
 @app.route('/items/search', methods=["GET"])
 def search():
     print(request)
@@ -23,7 +31,9 @@ def search():
 
 @app.route('/me', methods=["GET"])
 def me():
-    return jsonify([])
+    if 'email' in session:
+        return redirect('/items/search', 302)
+    
 
 @app.route('/user/signup', methods=["POST"])
 def register():
@@ -73,13 +83,24 @@ def login():
 @app.route('/newitem', methods=['POST'])
 def AddItem():
     users= mongo.db.items
-    name= request.get_json()['name']
-    description= request.get_json()['description']
-    condition= request.get_json()['condition']
-    price= request.get_json()['price']
-    category= request.get_json()['category']
-    email= request.get_json()['email']
-    image= request.get_json()['image']
+    name= request.form['name']
+    description= request.form['description']
+    condition= request.form['condition']
+    price= request.form['price']
+    category= request.form['category']
+    email= request.form['email']
+    image= request.files['image']
+    if 'image' not in request.files:
+        return jsonify('no file uploaded')
+        image= request.files['image']
+    if image.filename== '':
+        return jsonify('no file selected')
+    if not allowed_file(image.filename):
+        return jsonify('invalid')
+
+    if image: 
+            filename = secure_filename(image.filename)
+            image.save(os.path.join(app.config['UPLOAD_FOLDER'], filename))
 
     if 'email' in session:
         product_id= users.insert({
@@ -89,9 +110,9 @@ def AddItem():
             'price': price,
             'category': category,
             'email': email,
-            'image': image
+            'image': filename
             })
-        return('Data inserted ')
+        return('Item Added to Database')
         
     else:
         return jsonify('You are not logged in'), 400
