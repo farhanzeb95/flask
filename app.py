@@ -3,7 +3,8 @@ from flask_pymongo import PyMongo
 from bson.objectid import ObjectId
 from datetime import datetime
 from flask_bcrypt import Bcrypt
-from AddUser import User
+from werkzeug import secure_filename
+from AddUser import User, AddItem
 
 app = Flask(__name__)
 app.debug = True
@@ -69,6 +70,33 @@ def login():
             return jsonify("Login Successful"), 200
     return jsonify("Invalid Email or Password"), 501
 
+@app.route('/newitem', methods=['POST'])
+def AddItem():
+    users= mongo.db.items
+    name= request.get_json()['name']
+    description= request.get_json()['description']
+    condition= request.get_json()['condition']
+    price= request.get_json()['price']
+    category= request.get_json()['category']
+    email= request.get_json()['email']
+    image= request.get_json()['image']
+
+    if 'email' in session:
+        product_id= users.insert({
+            'name': name,
+            'description': description,
+            'condition': condition,
+            'price': price,
+            'category': category,
+            'email': email,
+            'image': image
+            })
+        return('Data inserted ')
+        
+    else:
+        return jsonify('You are not logged in'), 400
+            
+    
 @app.route('/logout', methods=['POST'])
 def logout():
     session.pop('email', None)
